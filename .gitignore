@@ -1,0 +1,6 @@
+/config.php
+/uploads/*
+!/uploads/.htaccess
+/design-preview.png
+/.env
+/*.log
