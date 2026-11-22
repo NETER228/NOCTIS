@@ -21,6 +21,12 @@ $samples = [
     ['Космос', 'Изображения космоса', 'Чёрная дыра', 'Изображение предоставлено владельцем коллекции.', 'black-hole.png'],
     ['Архитектура', 'Формы, линии и городское пространство', 'Арки музея', 'Демонстрационное изображение, созданное с помощью ИИ.', 'architecture.png'],
     ['Природа', 'Пейзажи и природные детали', 'Озеро на рассвете', 'Демонстрационное изображение, созданное с помощью ИИ.', 'nature.png'],
+    ['Архитектура', 'Формы, линии и городское пространство', 'Башни Axel в Копенгагене', 'Фото: Joakim Nådell / Unsplash. Источник: https://unsplash.com/photos/K67sBVqLLuw', 'pinterest-axel-towers.jpg'],
+    ['Люди', 'Портреты и моменты жизни', 'Отдых в траве', 'Фото: Sonia Dauer / Unsplash. Источник: https://unsplash.com/photos/SBZ0bK2gkAs', 'pinterest-field.jpg'],
+    ['Природа', 'Пейзажи и природные детали', 'Снежный горный хребет', 'Фото: Will Turner / Unsplash. Источник: https://unsplash.com/photos/tNt7fOOOgKA', 'pinterest-snow-range.jpg'],
+    ['Архитектура', 'Формы, линии и городское пространство', 'Спиральное здание', 'Фото: Claudio Schwarz / Unsplash. Источник: https://unsplash.com/photos/XYnRUulQnF8', 'pinterest-spiral-building.jpg'],
+    ['Природа', 'Пейзажи и природные детали', 'Горные вершины', 'Фото: Kerensa Pickett / Unsplash. Источник: https://unsplash.com/photos/GjpUV4k76F8', 'pinterest-mountain-peaks.jpg'],
+    ['Архитектура', 'Формы, линии и городское пространство', 'Современное здание', 'Фото: Julien Moreau / Unsplash. Источник: https://unsplash.com/photos/688Fna1pwOQ', 'pinterest-modern-building.jpg'],
 ];
 
 $insertAlbum = $pdo->prepare('INSERT IGNORE INTO albums (title, description) VALUES (?, ?)');
@@ -36,11 +42,13 @@ foreach ($samples as [$albumTitle, $albumDescription, $title, $description, $ass
     if ($findPhoto->fetchColumn()) continue;
 
     $source = __DIR__ . '/assets/' . $asset;
-    $filename = bin2hex(random_bytes(16)) . '.png';
+    $extension = strtolower(pathinfo($asset, PATHINFO_EXTENSION));
+    $filename = bin2hex(random_bytes(16)) . '.' . $extension;
+    $mimeType = $extension === 'png' ? 'image/png' : 'image/jpeg';
     $target = __DIR__ . '/uploads/' . $filename;
     if (!copy($source, $target)) throw new RuntimeException('Cannot copy demo photo to uploads.');
     try {
-        $insertPhoto->execute([$albumId, $title, $description, $filename, $asset, 'image/png', filesize($target)]);
+        $insertPhoto->execute([$albumId, $title, $description, $filename, $asset, $mimeType, filesize($target)]);
     } catch (Throwable $error) {
         unlink($target);
         throw $error;
