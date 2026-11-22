@@ -12,31 +12,39 @@ if (!is_file($configFile)) {
 }
 $c = require $configFile;
 $pdo = new PDO(
-    'mysql:host=' . $c['db_host'] . ';dbname=' . $c['db_name'] . ';charset=utf8mb4',
+    'mysql:host=' . $c['db_host'] . ';port=' . ($c['db_port'] ?? 3306) . ';dbname=' . $c['db_name'] . ';charset=utf8mb4',
     $c['db_user'], $c['db_password'],
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
 );
 
-$pdo->prepare('INSERT IGNORE INTO albums (title, description) VALUES (?, ?)')
-    ->execute(['Космос', 'Изображения космоса']);
-$album = $pdo->query("SELECT id FROM albums WHERE title = 'Космос'")->fetchColumn();
-$check = $pdo->prepare('SELECT id FROM photos WHERE album_id = ? AND title = ?');
-$check->execute([$album, 'Чёрная дыра']);
-if ($check->fetchColumn()) {
-    exit("Demo photo already exists.\n");
-}
+$samples = [
+    ['Космос', 'Изображения космоса', 'Чёрная дыра', 'Изображение предоставлено владельцем коллекции.', 'black-hole.png'],
+    ['Архитектура', 'Формы, линии и городское пространство', 'Арки музея', 'Демонстрационное изображение, созданное с помощью ИИ.', 'architecture.png'],
+    ['Природа', 'Пейзажи и природные детали', 'Озеро на рассвете', 'Демонстрационное изображение, созданное с помощью ИИ.', 'nature.png'],
+];
 
-$source = __DIR__ . '/assets/black-hole.png';
-$filename = bin2hex(random_bytes(16)) . '.png';
-$target = __DIR__ . '/uploads/' . $filename;
-if (!copy($source, $target)) {
-    throw new RuntimeException('Cannot copy demo photo to uploads.');
+$insertAlbum = $pdo->prepare('INSERT IGNORE INTO albums (title, description) VALUES (?, ?)');
+$findAlbum = $pdo->prepare('SELECT id FROM albums WHERE title = ?');
+$findPhoto = $pdo->prepare('SELECT id FROM photos WHERE album_id = ? AND title = ?');
+$insertPhoto = $pdo->prepare('INSERT INTO photos (album_id, title, description, filename, original_name, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?, ?)');
+$added = 0;
+foreach ($samples as [$albumTitle, $albumDescription, $title, $description, $asset]) {
+    $insertAlbum->execute([$albumTitle, $albumDescription]);
+    $findAlbum->execute([$albumTitle]);
+    $albumId = (int)$findAlbum->fetchColumn();
+    $findPhoto->execute([$albumId, $title]);
+    if ($findPhoto->fetchColumn()) continue;
+
+    $source = __DIR__ . '/assets/' . $asset;
+    $filename = bin2hex(random_bytes(16)) . '.png';
+    $target = __DIR__ . '/uploads/' . $filename;
+    if (!copy($source, $target)) throw new RuntimeException('Cannot copy demo photo to uploads.');
+    try {
+        $insertPhoto->execute([$albumId, $title, $description, $filename, $asset, 'image/png', filesize($target)]);
+    } catch (Throwable $error) {
+        unlink($target);
+        throw $error;
+    }
+    $added++;
 }
-try {
-    $pdo->prepare('INSERT INTO photos (album_id, title, description, filename, original_name, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$album, 'Чёрная дыра', 'Изображение предоставлено владельцем коллекции.', $filename, 'black-hole.png', 'image/png', filesize($target)]);
-} catch (Throwable $error) {
-    unlink($target);
-    throw $error;
-}
-echo "Demo photo added.\n";
+echo "Demo photos added: $added.\n";
